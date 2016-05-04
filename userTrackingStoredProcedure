@@ -1,0 +1,174 @@
+DELIMITER //
+CREATE PROCEDURE GetUserTrackingData()
+BEGIN
+
+#first clear the contents of the user tracking table
+truncate table wp_user_tracking;
+
+#insert 1 : username, date entered study, days since regsitered
+insert into wp_user_tracking(username,date_entered_study,days_since_registered) 
+SELECT user_login, registered, DATEDIFF(curdate(),activated) from wp_signups where DATEDIFF(curdate(),activated) >= 42;
+
+#update 2 : six week date
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking set six_week_date = date_add(date_entered_study, interval 6 week);
+
+
+#update 3 : total number of logins ever
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select username, count(*) as count from wp_simple_login_log s, wp_user_tracking u where s.user_login = u.username  group by username ) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_log_ins_ever = counttable.count;
+
+#update 4 : total number of logins in first six weeks
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select username, count(*) as count from wp_simple_login_log s, wp_user_tracking u where s.user_login = u.username and (s.time between u.date_entered_study and date_add(u.date_entered_study, interval 6 week)) group by username ) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_log_ins_1st_6_weeks = counttable.count;
+
+#update 5 : mean logins per week total logins/number of days
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+set wp_user_tracking.mean_num_of_log_ins_per_week = wp_user_tracking.total_num_of_log_ins_ever/(wp_user_tracking.days_since_registered/7); 
+
+
+#update 9 : total number of blog posts viewed in first six weeks
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, s.username
+			from wp_slim_stats s, wp_user_tracking u, wp_posts p 
+			where s.username=u.username and s.content_id = p.ID and p.post_type='post' and 
+			((DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) between (DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) 
+			and u.six_week_date) group by s.username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_BP_views_1st_6_weeks = counttable.count;
+
+#update 10 : total number of blog posts viewed ever
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, username 
+			from wp_slim_stats s, wp_posts p 
+			where s.content_id = p.ID and p.post_type='post' 
+			group by username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_BP_views_ever = counttable.count; 
+
+#update 11 : mean number of blog posts  viewed per week
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+set wp_user_tracking.mean_num_of_BP_views_per_week = wp_user_tracking.total_num_of_BP_views_ever/(wp_user_tracking.days_since_registered/7);
+
+
+#update 12: total number of EBP viewed in first six weeks 
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, s.username
+			from wp_slim_stats s, wp_user_tracking u, wp_posts p
+			where s.username=u.username and  s.content_id = p.ID and
+			((DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) between (DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) 
+			and u.six_week_date) and post_status = 'publish' and post_name like '%educateyourself%' 
+			group by s.username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_EBP_views_1st_6_weeks = counttable.count;
+
+
+#update 13: total number of EBP viewed ever
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, s.username
+			from wp_slim_stats s, wp_user_tracking u, wp_posts p
+			where s.username=u.username and  s.content_id = p.ID and
+			post_status = 'publish' and post_name like '%educateyourself%' group by s.username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_EBP_views_ever = counttable.count;
+
+#update 14 : mean number of EBP viewed per week
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+set wp_user_tracking.mean_num_of_EBP_views_per_week = wp_user_tracking.total_num_of_EBP_views_ever/(wp_user_tracking.days_since_registered/7);
+
+
+#update 15: total number of SBP viewed first six weeks
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, s.username
+			from wp_slim_stats s, wp_user_tracking u, wp_posts p
+			where s.username=u.username and  s.content_id = p.ID and
+			((DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) between (DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) 
+			and u.six_week_date) and post_status = 'publish' and post_name like '%socialmediaguide%' 
+			group by s.username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_SBP_views_1st_6_weeks = counttable.count;
+
+#update 16 : total number of SBP viewed ever
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, s.username
+			from wp_slim_stats s, wp_user_tracking u, wp_posts p
+			where s.username=u.username and  s.content_id = p.ID and
+			post_status = 'publish' and post_name like '%socialmediaguide%' group by s.username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_SBP_views_ever = counttable.count;
+
+#update 17 : mean number of SBP viewed per week
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+set wp_user_tracking.mean_num_of_SBP_views_per_week = wp_user_tracking.total_num_of_SBP_views_ever/(wp_user_tracking.days_since_registered/7);
+
+#update 18: total number of PBP viewed first six weeks
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, s.username
+			from wp_slim_stats s, wp_user_tracking u, wp_posts p
+			where s.username=u.username and  s.content_id = p.ID and
+			((DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) between (DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) 
+			and u.six_week_date) and post_status = 'publish' and post_name like '%bepositive%' 
+			group by s.username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_PBP_views_1st_6_weeks = counttable.count;
+
+#update 19: total number of PBP viewed ever
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, s.username
+			from wp_slim_stats s, wp_user_tracking u, wp_posts p
+			where s.username=u.username and  s.content_id = p.ID and
+			post_status = 'publish' and post_name like '%bepositive%' group by s.username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_PBP_views_ever = counttable.count;
+
+#update 20 : mean number of PBP viewed per week
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+set wp_user_tracking.mean_num_of_PBP_views_per_week = wp_user_tracking.total_num_of_PBP_views_ever/(wp_user_tracking.days_since_registered/7); 
+
+#update 21: total number of LBP first six weeks
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, s.username
+			from wp_slim_stats s, wp_user_tracking u, wp_posts p
+			where s.username=u.username and  s.content_id = p.ID and
+			((DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) between (DATE_FORMAT(FROM_UNIXTIME(dt), '%Y-%m-%d')) 
+			and u.six_week_date) and post_status = 'publish' and post_name like '%links%' 
+			group by s.username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_LBP_views_1st_6_weeks = counttable.count;
+
+#update 22: total number of LBP ever
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+inner join (select count(distinct content_id) as count, s.username
+			from wp_slim_stats s, wp_user_tracking u, wp_posts p
+			where s.username=u.username and  s.content_id = p.ID and
+			post_status = 'publish' and post_name like '%links%' group by s.username) as counttable 
+On (wp_user_tracking.username = counttable.username)
+set wp_user_tracking.total_num_of_LBP_views_ever = counttable.count;
+
+#update 23 : mean number of LBP  viewed per week
+SET SQL_SAFE_UPDATES=0;
+update wp_user_tracking 
+set wp_user_tracking.mean_num_of_LBP_views_per_week = wp_user_tracking.total_num_of_LBP_views_ever/(wp_user_tracking.days_since_registered/7);
+END//
+DELIMITER ;
